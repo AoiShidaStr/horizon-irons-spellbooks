@@ -9,7 +9,7 @@
 use std::sync::atomic::{AtomicU32, Ordering};
 
 use horizon_client::mod_api::{
-    Flow, Host, ItemStack, NativeServerPlayer, Tag, Text, UseItemEvent,
+    EquipmentSlot, Flow, Host, ItemStack, NativeServerPlayer, Tag, Text, UseItemEvent,
 };
 
 use crate::aim;
@@ -78,14 +78,23 @@ pub fn tick(host: &mut dyn Host) {
     }
 }
 
-/// What each piece of mage armour adds, from what the player carries.
+/// What each piece of mage armour adds, from what the player wears (the four
+/// armour slots; `carried_items` is the inventory, which no armour slot is in).
 fn armour_bonus(host: &mut dyn Host) -> f32 {
-    let pieces = host
-        .carried_items()
-        .iter()
-        .filter(|(item, count)| book::is_mage_armour(item) && *count > 0)
-        .count()
-        .min(4);
+    const SLOTS: [EquipmentSlot; 4] = [
+        EquipmentSlot::Head,
+        EquipmentSlot::Chest,
+        EquipmentSlot::Legs,
+        EquipmentSlot::Feet,
+    ];
+    let mut pieces = 0;
+    for slot in SLOTS {
+        if let Some(stack) = host.equipment(slot) {
+            if book::is_mage_armour(&stack.item) {
+                pieces += 1;
+            }
+        }
+    }
     pieces as f32 * mana::ARMOUR_BONUS
 }
 

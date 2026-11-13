@@ -84,7 +84,9 @@ pub fn save(host: &mut dyn Host, player: u128, pool: &Pool) -> Result<(), Attach
 static SHOWN: LazyLock<Mutex<Option<(f32, f32)>>> = LazyLock::new(|| Mutex::new(None));
 
 pub fn shown() -> Option<(f32, f32)> {
-    *SHOWN.lock().expect("mana cache lock")
+    // A HUD draw must not panic because another thread panicked while holding
+    // this lock: the value read is still the last one written.
+    *SHOWN.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
 }
 
 /// The bar's text the server sends: `m=<mana>;x=<max>`, or an empty payload
@@ -121,7 +123,7 @@ pub fn decode(data: &[u8]) -> Option<(f32, f32)> {
 }
 
 pub fn remember(shown: Option<(f32, f32)>) {
-    *SHOWN.lock().expect("mana cache lock") = shown;
+    *SHOWN.lock().unwrap_or_else(|poisoned| poisoned.into_inner()) = shown;
 }
 
 #[cfg(test)]
