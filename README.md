@@ -90,4 +90,11 @@ Checked against Horizon `a85af177a82504f357ff10d5d40d0b7230e2ac32` (the revision
 
 ### Build and test status
 
-See `board/status/irons_spellbooks.md` for the last run's numbers.
+- `cargo horizon-mod check` on both files: **passes** (`.hmod`: mod, API 0.2, both;
+  `.hnmod`: native-mod, pinned `a85af177a…/5a64af9…`, for 26.3).
+- `cargo test -p mod-irons_spellbooks` against the pinned Horizon: **26 passed,
+  0 failed** (the crate compiles against the real `horizon-client`, so every
+  hook signature is checked).
+- `cargo check -p horizon-native-game` (the generated game binary, client
+  flavour, default features): **exit 0** (`Finished dev profile in 5m 43s`).
+- No dedicated-server engine build and no in-game smoke test yet.
