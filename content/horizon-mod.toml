@@ -1,0 +1,8 @@
+id = "irons_spellbooks"
+name = "Iron's Spellbooks"
+version = "0.1.0"
+description = "Mana, scrolls, spellbooks, mage gear and a core set of spells. A clean-room Horizon port of Iron's Spellbooks' behaviour (the original is All-Rights-Reserved: no code, data or art is copied); the native half is the .hnmod beside this file."
+authors = ["Saison 2 server"]
+api = "0.2"
+side = "both"
+capabilities = ["registries"]

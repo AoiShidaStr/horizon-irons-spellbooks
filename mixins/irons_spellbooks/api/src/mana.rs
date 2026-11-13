@@ -37,6 +37,18 @@ impl Pool {
         pool
     }
 
+    /// Rebuilds a pool read from a player's saved data. Only cooldowns whose
+    /// spell still exists are kept.
+    pub fn restore(mana: f32, bonus: f32, cooldowns: Vec<(&'static str, u32)>) -> Self {
+        let mut pool = Self::default();
+        pool.set_bonus(bonus);
+        pool.set(mana);
+        for (spell, ticks) in cooldowns {
+            pool.start_cooldown(spell, ticks);
+        }
+        pool
+    }
+
     pub fn max(&self) -> f32 {
         BASE_MAX + self.bonus.max(0.0)
     }
@@ -148,6 +160,17 @@ mod tests {
         assert_eq!(pool.mana, 100.0);
         pool.add(-250.0);
         assert_eq!(pool.mana, 0.0);
+    }
+
+    #[test]
+    fn a_restored_pool_is_kept_within_its_bounds() {
+        let pool = Pool::restore(250.0, ARMOUR_BONUS, vec![("heal", 40)]);
+        assert_eq!(pool.max(), 125.0);
+        assert_eq!(pool.mana, 125.0);
+        assert_eq!(pool.cooldown("heal"), 40);
+        let broken = Pool::restore(f32::NAN, -5.0, Vec::new());
+        assert_eq!(broken.mana, BASE_MAX);
+        assert_eq!(broken.max(), BASE_MAX);
     }
 
     #[test]

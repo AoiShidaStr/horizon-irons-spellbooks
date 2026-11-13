@@ -1,0 +1,12 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "ingredients": [
+    "minecraft:paper",
+    "irons_spellbooks:arcane_essence",
+    "minecraft:blaze_powder"
+  ],
+  "result": {
+    "id": "irons_spellbooks:scroll_firebolt",
+    "count": 1
+  }
+}

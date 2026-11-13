@@ -1,0 +1,13 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "ingredients": [
+    "minecraft:paper",
+    "irons_spellbooks:arcane_essence",
+    "minecraft:ender_pearl",
+    "irons_spellbooks:arcane_essence"
+  ],
+  "result": {
+    "id": "irons_spellbooks:scroll_teleport",
+    "count": 1
+  }
+}

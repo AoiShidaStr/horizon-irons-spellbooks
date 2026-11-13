@@ -1,0 +1,13 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "ingredients": [
+    "minecraft:book",
+    "minecraft:leather",
+    "irons_spellbooks:arcane_essence",
+    "irons_spellbooks:arcane_essence"
+  ],
+  "result": {
+    "id": "irons_spellbooks:apprentice_spellbook",
+    "count": 1
+  }
+}

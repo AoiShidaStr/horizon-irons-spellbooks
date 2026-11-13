@@ -1,0 +1,25 @@
+{
+  "title": "itemGroup.irons_spellbooks.spellbooks",
+  "icon": "irons_spellbooks:archmage_spellbook",
+  "items": [
+    "irons_spellbooks:scroll_firebolt",
+    "irons_spellbooks:scroll_fireball",
+    "irons_spellbooks:scroll_icicle",
+    "irons_spellbooks:scroll_frost_step",
+    "irons_spellbooks:scroll_lightning_bolt",
+    "irons_spellbooks:scroll_heal",
+    "irons_spellbooks:scroll_fortify",
+    "irons_spellbooks:scroll_magic_missile",
+    "irons_spellbooks:scroll_teleport",
+    "irons_spellbooks:scroll_gust",
+    "irons_spellbooks:apprentice_spellbook",
+    "irons_spellbooks:journeyman_spellbook",
+    "irons_spellbooks:archmage_spellbook",
+    "irons_spellbooks:wizard_hat",
+    "irons_spellbooks:wizard_robe",
+    "irons_spellbooks:wizard_leggings",
+    "irons_spellbooks:wizard_boots",
+    "irons_spellbooks:arcane_staff",
+    "irons_spellbooks:arcane_essence"
+  ]
+}

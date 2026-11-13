@@ -1,0 +1,14 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "ingredients": [
+    "minecraft:stick",
+    "minecraft:blaze_rod",
+    "irons_spellbooks:arcane_essence",
+    "irons_spellbooks:arcane_essence",
+    "irons_spellbooks:arcane_essence"
+  ],
+  "result": {
+    "id": "irons_spellbooks:arcane_staff",
+    "count": 1
+  }
+}

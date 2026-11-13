@@ -1,0 +1,12 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "ingredients": [
+    "minecraft:paper",
+    "irons_spellbooks:arcane_essence",
+    "minecraft:glowstone_dust"
+  ],
+  "result": {
+    "id": "irons_spellbooks:scroll_heal",
+    "count": 1
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "item.irons_spellbooks.apprentice_spellbook": "Grimoire d'apprenti",
+  "item.irons_spellbooks.arcane_essence": "Essence arcanique",
+  "item.irons_spellbooks.arcane_staff": "Bâton arcanique",
+  "item.irons_spellbooks.archmage_spellbook": "Grimoire d'archimage",
+  "item.irons_spellbooks.journeyman_spellbook": "Grimoire de compagnon",
+  "item.irons_spellbooks.scroll_fireball": "Parchemin : Boule de feu",
+  "item.irons_spellbooks.scroll_firebolt": "Parchemin : Trait de feu",
+  "item.irons_spellbooks.scroll_fortify": "Parchemin : Renfort",
+  "item.irons_spellbooks.scroll_frost_step": "Parchemin : Pas de givre",
+  "item.irons_spellbooks.scroll_gust": "Parchemin : Bourrasque",
+  "item.irons_spellbooks.scroll_heal": "Parchemin : Soin",
+  "item.irons_spellbooks.scroll_icicle": "Parchemin : Stalactite",
+  "item.irons_spellbooks.scroll_lightning_bolt": "Parchemin : Éclair",
+  "item.irons_spellbooks.scroll_magic_missile": "Parchemin : Projectile magique",
+  "item.irons_spellbooks.scroll_teleport": "Parchemin : Téléportation",
+  "item.irons_spellbooks.wizard_boots": "Bottes de sorcier",
+  "item.irons_spellbooks.wizard_hat": "Chapeau de sorcier",
+  "item.irons_spellbooks.wizard_leggings": "Jambières de sorcier",
+  "item.irons_spellbooks.wizard_robe": "Robe de sorcier",
+  "itemGroup.irons_spellbooks.spellbooks": "Iron's Spellbooks"
+}

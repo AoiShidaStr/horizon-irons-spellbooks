@@ -1,0 +1,22 @@
+{
+  "item.irons_spellbooks.apprentice_spellbook": "Apprentice Spellbook",
+  "item.irons_spellbooks.arcane_essence": "Arcane Essence",
+  "item.irons_spellbooks.arcane_staff": "Arcane Staff",
+  "item.irons_spellbooks.archmage_spellbook": "Archmage Spellbook",
+  "item.irons_spellbooks.journeyman_spellbook": "Journeyman Spellbook",
+  "item.irons_spellbooks.scroll_fireball": "Scroll of Fireball",
+  "item.irons_spellbooks.scroll_firebolt": "Scroll of Firebolt",
+  "item.irons_spellbooks.scroll_fortify": "Scroll of Fortify",
+  "item.irons_spellbooks.scroll_frost_step": "Scroll of Frost Step",
+  "item.irons_spellbooks.scroll_gust": "Scroll of Gust",
+  "item.irons_spellbooks.scroll_heal": "Scroll of Heal",
+  "item.irons_spellbooks.scroll_icicle": "Scroll of Icicle",
+  "item.irons_spellbooks.scroll_lightning_bolt": "Scroll of Lightning Bolt",
+  "item.irons_spellbooks.scroll_magic_missile": "Scroll of Magic Missile",
+  "item.irons_spellbooks.scroll_teleport": "Scroll of Teleport",
+  "item.irons_spellbooks.wizard_boots": "Wizard Boots",
+  "item.irons_spellbooks.wizard_hat": "Wizard Hat",
+  "item.irons_spellbooks.wizard_leggings": "Wizard Leggings",
+  "item.irons_spellbooks.wizard_robe": "Wizard Robe",
+  "itemGroup.irons_spellbooks.spellbooks": "Iron's Spellbooks"
+}

@@ -1,0 +1,16 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "ingredients": [
+    "irons_spellbooks:journeyman_spellbook",
+    "irons_spellbooks:arcane_essence",
+    "irons_spellbooks:arcane_essence",
+    "irons_spellbooks:arcane_essence",
+    "irons_spellbooks:arcane_essence",
+    "irons_spellbooks:arcane_essence",
+    "irons_spellbooks:arcane_essence"
+  ],
+  "result": {
+    "id": "irons_spellbooks:archmage_spellbook",
+    "count": 1
+  }
+}
