@@ -37,11 +37,12 @@ files, so they can be regenerated and audited.
   page), `tooltip` (school, level, mana, rest, effect and how to use),
   `hud` (mana bar in the bottom-right corner), `net_from_server` (the bar's
   value).
-- Casting runs on the server through the game's own commands and helpers:
-  projectiles are summoned with their motion (`small_fireball`, `arrow` with
-  `damage`, `breeze_wind_charge`), lightning at the crosshair's block, blink
-  through `teleport_player`, heal and fortify through vanilla effects. No item
-  is consumed in creative.
+- Casting runs on the server: projectiles are spawned with `Host::summon`
+  (`small_fireball`, `arrow` with `damage`, `breeze_wind_charge`) carrying
+  their `Motion`, lightning is a summoned `lightning_bolt` where the crosshair
+  meets a block, blink is `teleport_player`, and heal and fortify run `/effect`
+  as the caster (`run_command_as`, since `run_command` is the console's and
+  cannot run inside a player's use hook). No item is consumed in creative.
 
 **Content**
 
@@ -66,6 +67,15 @@ files, so they can be regenerated and audited.
   off-hand read and no anvil-like interaction). Admin path:
   `/give @s irons_spellbooks:apprentice_spellbook[minecraft:custom_data={isb:"s=0;b=firebolt:2,heal:1"}]`
   and `/give @s irons_spellbooks:scroll_heal[minecraft:custom_data={isb:"l=3"}]`.
+- **Heal and Fortify need the caster's own permissions**: they run `/effect`
+  as the caster, so a survival player who is not an operator is told the mana
+  was spent while nothing happens (the mana is refunded only when the spell
+  helper itself fails).
+- **Sneak + use does not change the page the spellbook casts**: the message
+  names the next page, but the use hook is handed an immutable stack and the
+  API has no helper that writes the held stack back, so the selection saved in
+  `isb` (`s=`) never changes and every cast uses the page already stored. Only
+  `/give … custom_data={isb:"s=1;b=…"}` selects another page.
 - **The mana bar does not show a cooldown sweep**, and is a plain box.
 - **Mage armour is stat-wise vanilla leather** apart from the mana bonus the
   native half grants; no attribute modifiers yet.

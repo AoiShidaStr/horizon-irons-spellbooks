@@ -9,7 +9,7 @@
 use std::sync::atomic::{AtomicU32, Ordering};
 
 use horizon_client::mod_api::{
-    EquipmentSlot, Flow, Host, ItemStack, NativeServerPlayer, Tag, Text, UseItemEvent,
+    Compound, EquipmentSlot, Flow, Host, ItemStack, NativeServerPlayer, Tag, Text, UseItemEvent,
 };
 
 use crate::aim;
@@ -233,8 +233,9 @@ fn play(
     match spell.kind {
         Kind::Heal => {
             let amplifier = ((strength / 4.0).round() as i32).clamp(0, 4);
-            command(
+            command_as(
                 host,
+                player.uuid,
                 &format!(
                     "effect give {} minecraft:instant_health 1 {amplifier} true",
                     player.name
@@ -249,8 +250,9 @@ fn play(
                 if distance(player.position, other.position) > f64::from(spell.range) {
                     continue;
                 }
-                any |= command(
+                any |= command_as(
                     host,
+                    player.uuid,
                     &format!(
                         "effect give {} minecraft:absorption 60 {amplifier} true",
                         other.name
@@ -264,13 +266,13 @@ fn play(
             let Some(hit) = hit else {
                 return false;
             };
-            command(
-                host,
-                &format!(
-                    "summon minecraft:lightning_bolt {:.2} {:.2} {:.2}",
-                    hit.x, hit.y, hit.z
-                ),
+            host.summon(
+                &player.dimension,
+                "minecraft:lightning_bolt",
+                [hit.x, hit.y, hit.z],
+                Compound::new(),
             )
+            .is_some()
         }
         Kind::FrostStep | Kind::Teleport => {
             let wanted = f64::from(strength);
@@ -292,50 +294,63 @@ fn play(
                 player.pitch,
             )
         }
-        Kind::Firebolt => projectile(host, player, dir, "minecraft:small_fireball", 1.4, ""),
-        Kind::Fireball => projectile(host, player, dir, "minecraft:small_fireball", 0.8, ""),
-        Kind::Icicle => projectile(
-            host,
-            player,
-            dir,
-            "minecraft:arrow",
-            2.6,
-            &format!(",damage:{:.2}d,crit:1b", strength),
-        ),
-        Kind::MagicMissile => projectile(
-            host,
-            player,
-            dir,
-            "minecraft:arrow",
-            3.2,
-            &format!(",damage:{:.2}d,NoGravity:1b", strength),
-        ),
-        Kind::Gust => projectile(host, player, dir, "minecraft:breeze_wind_charge", 1.2, ""),
+        Kind::Firebolt => projectile(host, player, dir, "minecraft:small_fireball", 1.4),
+        Kind::Fireball => projectile(host, player, dir, "minecraft:small_fireball", 0.8),
+        Kind::Icicle => arrow(host, player, dir, 2.6, strength, true),
+        Kind::MagicMissile => arrow(host, player, dir, 3.2, strength, false),
+        Kind::Gust => projectile(host, player, dir, "minecraft:breeze_wind_charge", 1.2),
     }
 }
 
+/// Spawns a projectile moving along `dir`.
+///
+/// `host.summon` rather than a `/summon`: `run_command` is the console's and
+/// does nothing inside a player's hook (`use_item` is one), so the whole cast
+/// used to fall through with the mana refunded.
 fn projectile(
     host: &mut dyn Host,
     player: &NativeServerPlayer,
     dir: [f64; 3],
     kind: &str,
     speed: f64,
-    extra: &str,
 ) -> bool {
     let from = aim::cast_from(player.position, dir, 1.0);
-    let motion = aim::motion(dir, speed);
-    command(
-        host,
-        &format!(
-            "summon {kind} {} {{Motion:{}{extra}}}",
-            aim::point(from),
-            aim::motion_list(motion)
-        ),
-    )
+    let mut nbt = Compound::new();
+    nbt.insert("Motion".into(), motion_tag(aim::motion(dir, speed)));
+    host.summon(&player.dimension, kind, from, nbt).is_some()
 }
 
-fn command(host: &mut dyn Host, line: &str) -> bool {
-    host.run_command(line)
+/// Spawns an arrow of the spell's strength; `gravity` false for Magic Missile.
+fn arrow(
+    host: &mut dyn Host,
+    player: &NativeServerPlayer,
+    dir: [f64; 3],
+    speed: f64,
+    damage: f32,
+    gravity: bool,
+) -> bool {
+    let from = aim::cast_from(player.position, dir, 1.0);
+    let mut nbt = Compound::new();
+    nbt.insert("Motion".into(), motion_tag(aim::motion(dir, speed)));
+    nbt.insert("crit".into(), Tag::Byte(1));
+    nbt.insert("pickup".into(), Tag::Byte(0));
+    nbt.insert("HasBeenShot".into(), Tag::Byte(1));
+    nbt.insert("damage".into(), Tag::Double(f64::from(damage).to_bits()));
+    if !gravity {
+        nbt.insert("NoGravity".into(), Tag::Byte(1));
+    }
+    host.summon(&player.dimension, "minecraft:arrow", from, nbt)
+        .is_some()
+}
+
+fn motion_tag(motion: [f64; 3]) -> Tag {
+    Tag::List(motion.iter().map(|v| Tag::Double(v.to_bits())).collect())
+}
+
+/// A command run as `player`: `run_command` is the console's and cannot run
+/// inside a player's hook, while `run_command_as` can when it is their hook.
+fn command_as(host: &mut dyn Host, player: u128, line: &str) -> bool {
+    host.run_command_as(player, line).ran
 }
 
 fn distance(a: [f64; 3], b: [f64; 3]) -> f64 {
