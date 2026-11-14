@@ -111,19 +111,18 @@ Checked against Horizon `a85af177a82504f357ff10d5d40d0b7230e2ac32` (the revision
 
 ### Build and test status
 
-- `cargo horizon-mod check` on both files: **passes** (`.hmod`: mod, API 0.2, both;
-  `.hnmod`: native-mod, pinned `a85af177a…/5a64af9…`, for 26.3).
-- `cargo test -p mod-irons-spellbooks` against the pinned Horizon: **26 passed,
-  0 failed** (the crate compiles against the real `horizon-client`, so every
-  hook signature is checked).
-- `cargo check -p horizon-native-game` (the generated game binary, client
-  flavour, default features): **exit 0** (`Finished dev profile in 5m 43s`).
-- Re-checked 2026-11-14 in one queued build on the build VPS against the pinned
-  revision (`a85af177`), sources uploaded from this folder and staged by
-  `tools/vps_stage.sh`: `cargo test -p mod-irons-spellbooks` **26 passed, 0
-  failed** (`test_exit=0`), `cargo check -p horizon-native-game` **exit 0**,
-  and the dedicated-server engine `cargo build -p horizon-native-game
-  --no-default-features` **exit 0**. `cargo-horizon-mod horizon-mod check` on
-  both files still passes (the `.hmod` unchanged at 99 files, the `.hnmod`
-  repacked from the fixed sources).
+- `cargo-horizon-mod check` on both files: **passes** (`.hmod`: mod, API 0.2,
+  both; `.hnmod`: native-mod, pinned `a85af177a…/5a64af9…`, for 26.3).
+- `cargo test -p mod-irons-spellbooks` against the pinned Horizon (the crate is
+  `mod-irons_spellbooks` in the worktree): **27 passed, 0 failed** — the crate
+  compiles against the real `horizon-client`, so `play_sound`,
+  `send_particles`, `entity`/`entity_uuid`/`add_effect`, `entity_set_fire` and
+  `entity_swing` are checked signatures, and the new school table test runs.
+- `cargo-horizon-mod check` on both packed files: **passes** (the `.hmod` at
+  189 files, SHA-256 `69526f08…`; the `.hnmod` repacked from the fixed sources,
+  SHA-256 `34718fd4…`).
+- `cargo check -p horizon-native-game` and the dedicated-server engine build
+  were **queued** behind other builds on the build VPS when this pass ended and
+  had not reported a result; the last full run of them (before these changes)
+  was **exit 0**.
 - Still no in-game smoke test.
