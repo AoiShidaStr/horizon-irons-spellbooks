@@ -120,7 +120,7 @@ Checked against Horizon `a85af177a82504f357ff10d5d40d0b7230e2ac32` (the revision
   `entity_swing` are checked signatures, and the new school table test runs.
 - `cargo-horizon-mod check` on both packed files: **passes** (the `.hmod` at
   189 files, SHA-256 `69526f08…`; the `.hnmod` repacked from the fixed sources,
-  SHA-256 `34718fd4…`).
+  24393 bytes, SHA-256 `320e9e26…`).
 - `cargo check -p horizon-native-game` and the dedicated-server engine build
   were **queued** behind other builds on the build VPS when this pass ended and
   had not reported a result; the last full run of them (before these changes)

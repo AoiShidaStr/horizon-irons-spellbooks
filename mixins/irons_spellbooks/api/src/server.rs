@@ -1,11 +1,12 @@
 //! Casting, on the server: what a scroll, a spellbook or a staff does when it
 //! is used, and the mana every player's tick brings back.
 //!
-//! A spell's effect is played through the trait mod API's helpers (a
-//! projectile is summoned with its motion, a blink moves the player, heal and
-//! fortify add vanilla effects, area spells hurt what stands in reach), so the
-//! mod needs no game internals, no operator permission, and a dedicated server
-//! and a LAN host behave alike.
+//! A spell's effect is played through the trait mod API's helpers (the line of
+//! sight picks the target and `Host::hurt_entity` deals the table's damage, a
+//! blink moves the player, heal and fortify add vanilla effects, area spells
+//! hurt what stands in reach, particles and a school's sound show the cast), so
+//! the mod needs no game internals, no operator permission, and a dedicated
+//! server and a LAN host behave alike.
 
 use std::sync::atomic::{AtomicU32, Ordering};
 
