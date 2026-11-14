@@ -1,10 +1,11 @@
 //! Casting, on the server: what a scroll, a spellbook or a staff does when it
 //! is used, and the mana every player's tick brings back.
 //!
-//! A spell's effect is played through the game's own commands and helpers
-//! (a projectile is summoned with its motion, a blink moves the player, heal
-//! and fortify give vanilla effects), so the mod needs no game internals and a
-//! dedicated server and a LAN host behave alike.
+//! A spell's effect is played through the trait mod API's helpers (a
+//! projectile is summoned with its motion, a blink moves the player, heal and
+//! fortify add vanilla effects, area spells hurt what stands in reach), so the
+//! mod needs no game internals, no operator permission, and a dedicated server
+//! and a LAN host behave alike.
 
 use std::sync::atomic::{AtomicU32, Ordering};
 
@@ -639,12 +640,6 @@ fn arrow(
 
 fn motion_tag(motion: [f64; 3]) -> Tag {
     Tag::List(motion.iter().map(|v| Tag::Double(v.to_bits())).collect())
-}
-
-/// A command run as `player`: `run_command` is the console's and cannot run
-/// inside a player's hook, while `run_command_as` can when it is their hook.
-fn command_as(host: &mut dyn Host, player: u128, line: &str) -> bool {
-    host.run_command_as(player, line).ran
 }
 
 fn distance(a: [f64; 3], b: [f64; 3]) -> f64 {

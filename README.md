@@ -25,7 +25,8 @@ files, so they can be regenerated and audited.
 - `mana.rs`: a player's pool — 100 base, 25 per mage armour piece worn, +1 % of
   the maximum a second, per-spell cooldowns. Saved with the player as the
   `irons_spellbooks:pool` attachment (codec, copied on death).
-- `spells.rs`: 10 spells with school, level cap, mana cost, cooldown, strength,
+- `spells.rs`: 15 spells over 8 schools (Fire, Ice, Lightning, Holy, Ender,
+  Evocation, Blood, Nature) with level cap, mana cost, cooldown, strength,
   range and summary, plus Roman numerals and second formatting.
 - `aim.rs`: yaw/pitch direction, cast origin at the eye, blink distance clamped
   by the crosshair's block hit, `Motion` and coordinate formatting.
@@ -33,53 +34,52 @@ files, so they can be regenerated and audited.
   (5/8/10 pages) read from `minecraft:custom_data.isb` (`l=3`, `s=0;b=heal:2`),
   inscribing rules, page cycling and tearing a page out.
 - Hooks: `player_tick` (regen, armour bonus, cooldowns, mana message),
-  `use_item` (scroll cast + consume, spellbook cast, sneak+use to turn the
-  page), `tooltip` (school, level, mana, rest, effect and how to use),
-  `hud` (mana bar in the bottom-right corner), `net_from_server` (the bar's
-  value).
-- Casting runs on the server: projectiles are spawned with `Host::summon`
-  (`small_fireball`, `arrow` with `damage`, `breeze_wind_charge`) carrying
-  their `Motion`, lightning is a summoned `lightning_bolt` where the crosshair
-  meets a block, blink is `teleport_player`, and heal and fortify run `/effect`
-  as the caster (`run_command_as`, since `run_command` is the console's and
-  cannot run inside a player's use hook). No item is consumed in creative.
+  `use_item` (scroll cast + consume, spellbook cast and page turn, off-hand
+  scroll inscription, mana potion), `tooltip` (school, level, mana, rest,
+  effect and how to use), `hud` (mana bar in the bottom-right corner),
+  `net_from_server` (the bar's value).
+- Casting runs on the server through the trait API, so no `/effect` permission
+  is involved: `Host::add_effect` for Heal, Fortify, Blessing and the siphon's
+  self-heal, `Host::summon` for Firebolt's fireball and the Icicle, Thorn Dart
+  and Magic Missile arrows, `Host::lightning_bolt` for Lightning Bolt and Chain
+  Lightning, `Host::teleport_player` for the blinks, `Host::entities_in` /
+  `Host::level_entities` with `Host::hurt_entity` for the area blasts (Fireball
+  included), and `Host::push_mob` for Frost Nova and Gust.
+- Page turns and inscriptions write the held stack back (`Host::set_component`
+  + `Host::set_inventory_slot`), so the selected page survives the click and a
+  scroll held in the off hand is consumed into the book. A mana potion restores
+  50 mana when used. A quiet vanilla sound plays at the caster on a cast. No
+  item is consumed in creative.
 
 **Content**
 
-- 10 scrolls (paper, stack of 16, uncommon), 3 spellbooks (1 page stack,
-  uncommon/rare/epic), the wizard armour set, the arcane staff (+15 % spell
-  power while carried) and arcane essence.
-- Crafting recipes for all of them, a creative tab, English and French names,
-  item models and original 16×16 textures.
+- 15 scrolls (paper, stack of 16, uncommon), 3 spellbooks (1 page stack,
+  uncommon/rare/epic), four mage armour sets of four pieces (Wizard,
+  Pyromancer, Cryomancer, Electromancer; vanilla leather stats plus the native
+  mana bonus), the arcane staff (+15 % spell power while carried), arcane
+  essence and the mana potion.
+- Crafting recipes for all of them, a creative tab of 37 items, English and
+  French names, item models and original 16×16 textures.
 
 ## Missing
 
-- **Spell effects are approximations**, because the trait API has no entity
-  query or custom projectile: Firebolt/Fireball are small fireballs, Icicle and
-  Magic Missile are arrows (Magic Missile without gravity), Gust is a breeze
-  wind charge. They deal vanilla projectile damage, not the table's numbers.
-- **Fireball has no area damage** and **Gust does not push mobs around the
-  caster** (it throws a wind charge instead).
-- **No spellcasting animation, particles, sounds or boss loot**: casting plays
-  no sound yet.
-- **Scrolls and spellbooks cannot be inscribed in game**: `book.rs` implements
-  inscribing, but no hook combines a scroll with a spellbook yet (the API has no
-  off-hand read and no anvil-like interaction). Admin path:
-  `/give @s irons_spellbooks:apprentice_spellbook[minecraft:custom_data={isb:"s=0;b=firebolt:2,heal:1"}]`
-  and `/give @s irons_spellbooks:scroll_heal[minecraft:custom_data={isb:"l=3"}]`.
-- **Heal and Fortify need the caster's own permissions**: they run `/effect`
-  as the caster, so a survival player who is not an operator is told the mana
-  was spent while nothing happens (the mana is refunded only when the spell
-  helper itself fails).
-- **Sneak + use does not change the page the spellbook casts**: the message
-  names the next page, but the use hook is handed an immutable stack and the
-  API has no helper that writes the held stack back, so the selection saved in
-  `isb` (`s=`) never changes and every cast uses the page already stored. Only
-  `/give … custom_data={isb:"s=1;b=…"}` selects another page.
-- **The mana bar does not show a cooldown sweep**, and is a plain box.
-- **Mage armour is stat-wise vanilla leather** apart from the mana bonus the
-  native half grants; no attribute modifiers yet.
-- No mob that drops scrolls, no structure loot, no advancements.
+- **The direct-damage spells still use vanilla projectile damage** (Firebolt,
+  Icicle, Thorn Dart, Magic Missile, Lightning Bolt): only the area spells
+  (Fireball, Frost Nova, Chain Lightning) and Blood Siphon deal the table's
+  numbers.
+- **No status effects on mobs**: Frost Nova pushes and wounds instead of
+  slowing, and nothing applies poison, fire or weakness to a victim.
+- **No particle work, school-specific sounds or casting animation**: one
+  vanilla sound plays, and the HUD bar is a plain box without a cooldown sweep.
+- **Spell effects are still approximations**: Firebolt, Icicle, Thorn Dart and
+  Magic Missile are vanilla projectiles (no custom projectile entity), and
+  Magic Missile reaches its target only because its arrow ignores gravity.
+- **No mob that drops scrolls, no structure loot, no advancements.**
+- **Mage armour has no attribute modifiers or enchantment behaviour** beyond
+  the leather template and the native maximum-mana bonus.
+- **A spellbook's page can be torn out in `book.rs` but no in-game interaction
+  exposes it.**
+- Still no in-game smoke test.
 
 ## Building
 
@@ -102,14 +102,14 @@ Checked against Horizon `a85af177a82504f357ff10d5d40d0b7230e2ac32` (the revision
 
 - `cargo horizon-mod check` on both files: **passes** (`.hmod`: mod, API 0.2, both;
   `.hnmod`: native-mod, pinned `a85af177a…/5a64af9…`, for 26.3).
-- `cargo test -p mod-irons_spellbooks` against the pinned Horizon: **26 passed,
+- `cargo test -p mod-irons-spellbooks` against the pinned Horizon: **26 passed,
   0 failed** (the crate compiles against the real `horizon-client`, so every
   hook signature is checked).
 - `cargo check -p horizon-native-game` (the generated game binary, client
   flavour, default features): **exit 0** (`Finished dev profile in 5m 43s`).
 - Re-checked 2026-11-14 in one queued build on the build VPS against the pinned
   revision (`a85af177`), sources uploaded from this folder and staged by
-  `tools/vps_stage.sh`: `cargo test -p mod-irons_spellbooks` **26 passed, 0
+  `tools/vps_stage.sh`: `cargo test -p mod-irons-spellbooks` **26 passed, 0
   failed** (`test_exit=0`), `cargo check -p horizon-native-game` **exit 0**,
   and the dedicated-server engine `cargo build -p horizon-native-game
   --no-default-features` **exit 0**. `cargo-horizon-mod horizon-mod check` on
