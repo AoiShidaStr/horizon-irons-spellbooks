@@ -107,4 +107,12 @@ Checked against Horizon `a85af177a82504f357ff10d5d40d0b7230e2ac32` (the revision
   hook signature is checked).
 - `cargo check -p horizon-native-game` (the generated game binary, client
   flavour, default features): **exit 0** (`Finished dev profile in 5m 43s`).
-- No dedicated-server engine build and no in-game smoke test yet.
+- Re-checked 2026-11-14 in one queued build on the build VPS against the pinned
+  revision (`a85af177`), sources uploaded from this folder and staged by
+  `tools/vps_stage.sh`: `cargo test -p mod-irons_spellbooks` **26 passed, 0
+  failed** (`test_exit=0`), `cargo check -p horizon-native-game` **exit 0**,
+  and the dedicated-server engine `cargo build -p horizon-native-game
+  --no-default-features` **exit 0**. `cargo-horizon-mod horizon-mod check` on
+  both files still passes (the `.hmod` unchanged at 99 files, the `.hnmod`
+  repacked from the fixed sources).
+- Still no in-game smoke test.
