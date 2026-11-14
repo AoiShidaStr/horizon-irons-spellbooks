@@ -9,7 +9,8 @@
 use std::sync::atomic::{AtomicU32, Ordering};
 
 use horizon_client::mod_api::{
-    Compound, EquipmentSlot, Flow, Host, ItemStack, NativeServerPlayer, Tag, Text, UseItemEvent,
+    Compound, EquipmentSlot, Flow, Host, ItemStack, NativeEffect, NativeInventoryKind,
+    NativeServerPlayer, Tag, Text, UseItemEvent,
 };
 
 use crate::aim;
@@ -106,6 +107,30 @@ pub fn use_item(host: &mut dyn Host, event: &mut UseItemEvent<'_>) -> Flow {
         return Flow::Continue;
     };
 
+    if book::is_mana_potion(item) {
+        let Ok(mut pool) = state::pool(host, player.uuid) else {
+            return Flow::Cancel;
+        };
+        if pool.mana + 0.5 < pool.max() {
+            pool.add(mana::POTION_RESTORE);
+            let _ = state::save(host, player.uuid, &pool);
+            if player.game_mode != 1 {
+                host.take_items(item, 1);
+            }
+            host.action_bar(
+                player.uuid,
+                Text::literal(format!(
+                    "Mana restored: {} / {}",
+                    pool.mana.round() as i32,
+                    pool.max().round() as i32
+                )),
+            );
+        } else {
+            host.action_bar(player.uuid, Text::literal("Your mana is already full"));
+        }
+        return Flow::Cancel;
+    }
+
     if let Some(spell) = book::scroll_spell(item) {
         let level = book::scroll_level(custom_data(host, event.stack).as_deref());
         let outcome = cast(host, &player, spell, level, true);
@@ -118,18 +143,57 @@ pub fn use_item(host: &mut dyn Host, event: &mut UseItemEvent<'_>) -> Flow {
 
     if let Some(capacity) = book::book_capacity(item) {
         let mut spellbook = Book::parse(custom_data(host, event.stack).as_deref(), capacity);
+        // A scroll in the off hand is inscribed into the page the book opens
+        // on: the scroll is used up and the held book written back.
+        if let Some(off) = host.player_equipment(player.uuid, EquipmentSlot::OffHand) {
+            if let Some(spell) = book::scroll_spell(&off.item) {
+                let level = book::scroll_level(custom_data(host, &off).as_deref());
+                match spellbook.inscribe(spell, level, capacity) {
+                    Ok(()) => {
+                        if write_held(host, &player, event.stack, &spellbook.encode()) {
+                            if player.game_mode != 1 {
+                                host.take_items(&off.item, 1);
+                            }
+                            host.action_bar(
+                                player.uuid,
+                                Text::literal(format!(
+                                    "{} {} written into the spellbook",
+                                    spell.name,
+                                    spells::roman(level)
+                                )),
+                            );
+                        } else {
+                            host.action_bar(
+                                player.uuid,
+                                Text::literal("The spellbook could not be written"),
+                            );
+                        }
+                    }
+                    Err(refusal) => {
+                        host.action_bar(
+                            player.uuid,
+                            Text::literal(Refusal::Book(refusal).line(spell, level)),
+                        );
+                    }
+                }
+                return Flow::Cancel;
+            }
+        }
         if host.sneaking() {
             match spellbook.cycle(true) {
                 Some((spell, level)) => {
-                    host.action_bar(
-                        player.uuid,
-                        Text::literal(format!(
+                    let saved = write_held(host, &player, event.stack, &spellbook.encode());
+                    let line = if saved {
+                        format!(
                             "Page {}: {} {}",
                             spellbook.selected + 1,
                             spell.name,
                             spells::roman(level)
-                        )),
-                    );
+                        )
+                    } else {
+                        format!("The spellbook could not be written, page stays as it was")
+                    };
+                    host.action_bar(player.uuid, Text::literal(line));
                 }
                 None => {
                     host.action_bar(player.uuid, Text::literal("That spellbook has no pages yet"));
@@ -207,6 +271,7 @@ pub fn cast(
         let _ = state::save(host, player.uuid, &pool);
         return Err(Refusal::Mana(cost));
     }
+    cast_sound(host, player);
     // A scroll is spent anyway; both start the spell's rest.
     let ticks = if from_scroll { spell.cooldown / 2 } else { spell.cooldown };
     pool.start_cooldown(spell.id, ticks);
@@ -232,34 +297,30 @@ fn play(
     let dir = aim::direction(player.yaw, player.pitch);
     match spell.kind {
         Kind::Heal => {
-            let amplifier = ((strength / 4.0).round() as i32).clamp(0, 4);
-            command_as(
+            let amplifier = (strength / 4.0) as u8;
+            effect(
                 host,
                 player.uuid,
-                &format!(
-                    "effect give {} minecraft:instant_health 1 {amplifier} true",
-                    player.name
-                ),
+                "minecraft:instant_health",
+                amplifier.saturating_sub(1).min(4),
+                1,
             )
         }
         Kind::Fortify => {
-            let amplifier = ((strength / 4.0).ceil() as i32 - 1).clamp(0, 3);
+            let amplifier = ((strength / 4.0).ceil() as u8).saturating_sub(1).min(3);
             let mut any = false;
             let players = host.server_players();
             for other in players {
                 if distance(player.position, other.position) > f64::from(spell.range) {
                     continue;
                 }
-                any |= command_as(
-                    host,
-                    player.uuid,
-                    &format!(
-                        "effect give {} minecraft:absorption 60 {amplifier} true",
-                        other.name
-                    ),
-                );
+                any |= effect(host, other.uuid, "minecraft:absorption", amplifier, 1200);
             }
             any
+        }
+        Kind::Regeneration => {
+            let amplifier = (level - 1).min(3);
+            effect(host, player.uuid, "minecraft:regeneration", amplifier, 200)
         }
         Kind::LightningBolt => {
             let hit = host.raycast(spell.range);
@@ -273,6 +334,16 @@ fn play(
                 Compound::new(),
             )
             .is_some()
+        }
+        Kind::ChainLightning => {
+            let hit = host.raycast(spell.range);
+            let Some(hit) = hit else {
+                return false;
+            };
+            let at = [hit.x, hit.y, hit.z];
+            let _ = host.lightning_bolt(&player.dimension, at, true);
+            let _ = blast(host, player, at, 4.0, strength, "minecraft:magic");
+            true
         }
         Kind::FrostStep | Kind::Teleport => {
             let wanted = f64::from(strength);
@@ -295,11 +366,234 @@ fn play(
             )
         }
         Kind::Firebolt => projectile(host, player, dir, "minecraft:small_fireball", 1.4),
-        Kind::Fireball => projectile(host, player, dir, "minecraft:small_fireball", 0.8),
+        Kind::Fireball => {
+            let hit = host.raycast(spell.range);
+            let Some(hit) = hit else {
+                return false;
+            };
+            let at = [hit.x, hit.y, hit.z];
+            let _ = blast(host, player, at, 3.0, strength, "minecraft:magic");
+            true
+        }
+        Kind::FrostNova => {
+            let targets = within(host, &player.dimension, player.position, f64::from(spell.range));
+            let attacker = attacker(player);
+            let mut any = false;
+            for (id, at) in targets {
+                if is_self(player, id) {
+                    continue;
+                }
+                any |= host.hurt_entity(
+                    &player.dimension,
+                    id,
+                    strength,
+                    "minecraft:magic",
+                    attacker,
+                );
+                let away = [
+                    at[0] - player.position[0],
+                    0.25,
+                    at[2] - player.position[2],
+                ];
+                let length = (away[0] * away[0] + away[2] * away[2]).sqrt().max(0.1);
+                let push = [
+                    away[0] / length * 1.1,
+                    away[1],
+                    away[2] / length * 1.1,
+                ];
+                let _ = host.push_mob(&player.dimension, id, push);
+            }
+            let _ = any;
+            true
+        }
         Kind::Icicle => arrow(host, player, dir, 2.6, strength, true),
         Kind::MagicMissile => arrow(host, player, dir, 3.2, strength, false),
-        Kind::Gust => projectile(host, player, dir, "minecraft:breeze_wind_charge", 1.2),
+        Kind::Gust => {
+            let targets = in_front(host, player, dir, f64::from(spell.range) + 4.0, 3.0);
+            for (id, at) in targets {
+                if is_self(player, id) {
+                    continue;
+                }
+                let away = [
+                    at[0] - player.position[0],
+                    0.0,
+                    at[2] - player.position[2],
+                ];
+                let length = (away[0] * away[0] + away[2] * away[2]).sqrt().max(0.1);
+                let push = [
+                    dir[0] * 1.2 + away[0] / length * 0.8,
+                    0.5,
+                    dir[2] * 1.2 + away[2] / length * 0.8,
+                ];
+                let _ = host.push_mob(&player.dimension, id, push);
+            }
+            true
+        }
+        Kind::Siphon => {
+            let targets = in_front(host, player, dir, f64::from(spell.range), 2.5);
+            let attacker = attacker(player);
+            let Some((id, _)) = targets
+                .into_iter()
+                .min_by(|a, b| {
+                    let da = distance(player.position, a.1);
+                    let db = distance(player.position, b.1);
+                    da.total_cmp(&db)
+                })
+            else {
+                return false;
+            };
+            if !host.hurt_entity(
+                &player.dimension,
+                id,
+                strength,
+                "minecraft:magic",
+                attacker,
+            ) {
+                return false;
+            }
+            let amplifier = ((strength / 8.0) as u8).min(3);
+            let _ = effect(
+                host,
+                player.uuid,
+                "minecraft:instant_health",
+                amplifier,
+                1,
+            );
+            true
+        }
     }
+}
+
+/// Whether an entity id is the caster's own.
+fn is_self(player: &NativeServerPlayer, id: u32) -> bool {
+    player.entity_id > 0 && id == player.entity_id as u32
+}
+
+fn attacker(player: &NativeServerPlayer) -> Option<u32> {
+    (player.entity_id > 0).then_some(player.entity_id as u32)
+}
+
+/// Gives `id` to `uuid` as an effect; a duration of 1 tick is enough for the
+/// instant effects (`instant_health`).
+fn effect(host: &mut dyn Host, uuid: u128, id: &str, amplifier: u8, duration: i32) -> bool {
+    host.add_effect(
+        uuid,
+        &NativeEffect {
+            id: id.to_string(),
+            amplifier,
+            duration,
+            ambient: false,
+            particles: true,
+        },
+    )
+}
+
+/// The entities of the caster's level within `radius` blocks of `at`.
+fn within(
+    host: &mut dyn Host,
+    dimension: &str,
+    at: [f64; 3],
+    radius: f64,
+) -> Vec<(u32, [f64; 3])> {
+    host.level_entities(dimension)
+        .into_iter()
+        .filter(|(_, _, p)| distance(at, *p) <= radius)
+        .map(|(id, _, p)| (id, p))
+        .collect()
+}
+
+/// Damages everything within `radius` of `at`, the caster excepted.
+fn blast(
+    host: &mut dyn Host,
+    player: &NativeServerPlayer,
+    at: [f64; 3],
+    radius: f64,
+    damage: f32,
+    damage_type: &str,
+) -> bool {
+    let attacker = attacker(player);
+    let mut any = false;
+    for (id, _) in within(host, &player.dimension, at, radius) {
+        if is_self(player, id) {
+            continue;
+        }
+        any |= host.hurt_entity(&player.dimension, id, damage, damage_type, attacker);
+    }
+    any
+}
+
+/// The entities in a cone `reach` blocks long and `half_width` wide along
+/// `dir`, from where the caster stands.
+fn in_front(
+    host: &mut dyn Host,
+    player: &NativeServerPlayer,
+    dir: [f64; 3],
+    reach: f64,
+    half_width: f64,
+) -> Vec<(u32, [f64; 3])> {
+    host.level_entities(&player.dimension)
+        .into_iter()
+        .filter(|(_, _, p)| {
+            let d = [
+                p[0] - player.position[0],
+                p[1] - player.position[1],
+                p[2] - player.position[2],
+            ];
+            let along = d[0] * dir[0] + d[1] * dir[1] + d[2] * dir[2];
+            if along <= 0.0 || along > reach {
+                return false;
+            }
+            let side = (d[0] * d[0] + d[1] * d[1] + d[2] * d[2] - along * along).max(0.0).sqrt();
+            side <= half_width
+        })
+        .map(|(id, _, p)| (id, p))
+        .collect()
+}
+
+/// Writes a spellbook's new `isb` string over the held stack, checking that
+/// the slot still holds the stack the use hook was given.
+fn write_held(
+    host: &mut dyn Host,
+    player: &NativeServerPlayer,
+    expected: &ItemStack,
+    isb: &str,
+) -> bool {
+    let mut data = match host.component(expected, "minecraft:custom_data") {
+        Ok(Some(Tag::Compound(data))) => data.clone(),
+        _ => Compound::new(),
+    };
+    data.insert("isb".into(), Tag::String(isb.into()));
+    let mut stack = expected.clone();
+    if host
+        .set_component(&mut stack, "minecraft:custom_data", Tag::Compound(data))
+        .is_err()
+    {
+        return false;
+    }
+    host.set_inventory_slot(
+        player.uuid,
+        NativeInventoryKind::Player,
+        usize::from(player.selected_slot),
+        Some(expected),
+        Some(stack),
+    )
+    .is_ok()
+}
+
+/// A quiet casting sound at the caster's feet.
+fn cast_sound(host: &mut dyn Host, player: &NativeServerPlayer) {
+    let _ = host.play_sound_to(
+        player.uuid,
+        "minecraft:block.enchantment_table.use",
+        "player",
+        Some([
+            player.position[0],
+            player.position[1] + 1.0,
+            player.position[2],
+        ]),
+        0.7,
+        1.4,
+    );
 }
 
 /// Spawns a projectile moving along `dir`.

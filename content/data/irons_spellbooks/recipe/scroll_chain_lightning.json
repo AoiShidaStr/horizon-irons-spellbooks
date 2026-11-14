@@ -1,0 +1,13 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "ingredients": [
+    "minecraft:paper",
+    "irons_spellbooks:arcane_essence",
+    "minecraft:lightning_rod",
+    "irons_spellbooks:arcane_essence"
+  ],
+  "result": {
+    "id": "irons_spellbooks:scroll_chain_lightning",
+    "count": 1
+  }
+}

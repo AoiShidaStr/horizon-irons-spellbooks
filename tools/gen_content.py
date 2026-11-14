@@ -27,6 +27,11 @@ SCHOOLS = {
     "magic_missile": (0xC0, 0x5C, 0xF0),
     "teleport": (0x9A, 0x3C, 0xD0),
     "gust": (0x7B, 0xE0, 0x8C),
+    "frost_nova": (0xBF, 0xF0, 0xFF),
+    "chain_lightning": (0x8A, 0xA0, 0xFF),
+    "blessing": (0xFF, 0xF4, 0xB0),
+    "blood_siphon": (0xB0, 0x20, 0x30),
+    "thorn_dart": (0x4E, 0x9F, 0x3D),
 }
 
 SPELL_NAMES = {
@@ -40,6 +45,11 @@ SPELL_NAMES = {
     "magic_missile": "Magic Missile",
     "teleport": "Teleport",
     "gust": "Gust",
+    "frost_nova": "Frost Nova",
+    "chain_lightning": "Chain Lightning",
+    "blessing": "Blessing",
+    "blood_siphon": "Blood Siphon",
+    "thorn_dart": "Thorn Dart",
 }
 
 SPELL_FR = {
@@ -53,6 +63,11 @@ SPELL_FR = {
     "magic_missile": "Projectile magique",
     "teleport": "Téléportation",
     "gust": "Bourrasque",
+    "frost_nova": "Nova de givre",
+    "chain_lightning": "Éclair en chaîne",
+    "blessing": "Bénédiction",
+    "blood_siphon": "Siphon de sang",
+    "thorn_dart": "Fléchette d'épines",
 }
 
 BOOKS = {
@@ -61,12 +76,30 @@ BOOKS = {
     "archmage_spellbook": ("Archmage Spellbook", "Grimoire d'archimage", "epic", 10),
 }
 
-ARMOUR = {
-    "wizard_hat": ("Wizard Hat", "Chapeau de sorcier", "minecraft:leather_helmet"),
-    "wizard_robe": ("Wizard Robe", "Robe de sorcier", "minecraft:leather_chestplate"),
-    "wizard_leggings": ("Wizard Leggings", "Jambières de sorcier", "minecraft:leather_leggings"),
-    "wizard_boots": ("Wizard Boots", "Bottes de sorcier", "minecraft:leather_boots"),
+# One set per school of magic: a hat, a robe, leggings and boots of the same
+# cloth, each set with its own colour.
+ARMOUR_SETS = {
+    "wizard": ("Wizard", "sorcier", (0x4B, 0x2E, 0x6B, 0xFF)),
+    "pyromancer": ("Pyromancer", "pyromancien", (0xB0, 0x32, 0x24, 0xFF)),
+    "cryomancer": ("Cryomancer", "cryomancien", (0x2E, 0x6E, 0xB0, 0xFF)),
+    "electromancer": ("Electromancer", "électromancien", (0xC0, 0xA8, 0x2A, 0xFF)),
 }
+
+ARMOUR_PIECES = {
+    "hat": ("Hat", "Chapeau", "minecraft:leather_helmet"),
+    "robe": ("Robe", "Robe", "minecraft:leather_chestplate"),
+    "leggings": ("Leggings", "Jambières", "minecraft:leather_leggings"),
+    "boots": ("Boots", "Bottes", "minecraft:leather_boots"),
+}
+
+ARMOUR = {}
+for _set, (_title, _fr, _colour) in ARMOUR_SETS.items():
+    for _piece, (_en, _fr_piece, _template) in ARMOUR_PIECES.items():
+        ARMOUR[f"{_set}_{_piece}"] = (
+            f"{_title} {_en}",
+            f"{_fr_piece} de {_fr}",
+            _template,
+        )
 
 
 def write(path, text):
@@ -159,49 +192,63 @@ def book(cover):
     return pixels
 
 
-def hat():
+def hat(colour):
+    light = shade(colour, 1.35)
     pixels = blank()
     for y in range(2, 11):
         half = 1 + (y - 2) * 2 // 3
-        rect(pixels, 8 - half, y, 8 + half, y + 1, PURPLE)
-    rect(pixels, 3, 11, 14, 13, PURPLE_LIGHT)
-    rect(pixels, 3, 12, 14, 13, shade(PURPLE, 0.7))
+        rect(pixels, 8 - half, y, 8 + half, y + 1, colour)
+    rect(pixels, 3, 11, 14, 13, light)
+    rect(pixels, 3, 12, 14, 13, shade(colour, 0.7))
     rect(pixels, 6, 10, 11, 11, GOLD)
     rect(pixels, 7, 3, 9, 4, GOLD)
     return pixels
 
 
-def robe():
+def robe(colour):
+    light = shade(colour, 1.35)
     pixels = blank()
-    rect(pixels, 4, 3, 12, 6, PURPLE)
-    rect(pixels, 2, 6, 14, 14, PURPLE)
-    rect(pixels, 2, 6, 4, 14, PURPLE_LIGHT)
-    rect(pixels, 12, 6, 14, 14, shade(PURPLE, 0.7))
+    rect(pixels, 4, 3, 12, 6, colour)
+    rect(pixels, 2, 6, 14, 14, colour)
+    rect(pixels, 2, 6, 4, 14, light)
+    rect(pixels, 12, 6, 14, 14, shade(colour, 0.7))
     rect(pixels, 6, 6, 10, 8, GOLD)
     rect(pixels, 7, 8, 9, 14, GOLD)
-    rect(pixels, 6, 2, 10, 3, PURPLE_LIGHT)
+    rect(pixels, 6, 2, 10, 3, light)
     return pixels
 
 
-def leggings():
+def leggings(colour):
+    light = shade(colour, 1.35)
     pixels = blank()
-    rect(pixels, 4, 2, 12, 5, PURPLE)
-    rect(pixels, 4, 5, 7, 14, PURPLE)
-    rect(pixels, 9, 5, 12, 14, PURPLE)
-    rect(pixels, 4, 13, 7, 14, PURPLE_LIGHT)
-    rect(pixels, 9, 13, 12, 14, PURPLE_LIGHT)
+    rect(pixels, 4, 2, 12, 5, colour)
+    rect(pixels, 4, 5, 7, 14, colour)
+    rect(pixels, 9, 5, 12, 14, colour)
+    rect(pixels, 4, 13, 7, 14, light)
+    rect(pixels, 9, 13, 12, 14, light)
     rect(pixels, 4, 2, 12, 3, GOLD)
     return pixels
 
 
-def boots():
+def boots(colour):
+    light = shade(colour, 1.35)
     pixels = blank()
-    rect(pixels, 3, 6, 7, 13, PURPLE)
-    rect(pixels, 9, 6, 13, 13, PURPLE)
-    rect(pixels, 2, 12, 8, 14, PURPLE_LIGHT)
-    rect(pixels, 8, 12, 14, 14, PURPLE_LIGHT)
+    rect(pixels, 3, 6, 7, 13, colour)
+    rect(pixels, 9, 6, 13, 13, colour)
+    rect(pixels, 2, 12, 8, 14, light)
+    rect(pixels, 8, 12, 14, 14, light)
     rect(pixels, 3, 6, 7, 7, GOLD)
     rect(pixels, 9, 6, 13, 7, GOLD)
+    return pixels
+
+
+def mana_potion():
+    pixels = blank()
+    rect(pixels, 6, 1, 10, 3, (0xB0, 0xB8, 0xC8, 0xFF))
+    rect(pixels, 5, 3, 11, 15, (0xD8, 0xE8, 0xF0, 0xFF))
+    rect(pixels, 6, 7, 10, 14, (0x3A, 0x6B, 0xE0, 0xFF))
+    rect(pixels, 7, 8, 9, 12, (0x9A, 0xC0, 0xFF, 0xFF))
+    rect(pixels, 5, 5, 6, 13, (0xFF, 0xFF, 0xFF, 0xFF))
     return pixels
 
 
@@ -275,14 +322,16 @@ def main():
 
     # Mage armour.
     art = {
-        "wizard_hat": hat,
-        "wizard_robe": robe,
-        "wizard_leggings": leggings,
-        "wizard_boots": boots,
+        "hat": hat,
+        "robe": robe,
+        "leggings": leggings,
+        "boots": boots,
     }
     for name, (english, french, template) in ARMOUR.items():
+        set_name, piece = name.rsplit("_", 1)
+        colour = ARMOUR_SETS[set_name][2]
         item_file(name, template, {"rarity": "uncommon"})
-        png(f"assets/{NS}/textures/item/{name}.png", art[name]())
+        png(f"assets/{NS}/textures/item/{name}.png", art[piece](colour))
         en[f"item.{NS}.{name}"] = english
         fr[f"item.{NS}.{name}"] = french
         tab.append(f"{NS}:{name}")
@@ -298,6 +347,12 @@ def main():
     en[f"item.{NS}.arcane_essence"] = "Arcane Essence"
     fr[f"item.{NS}.arcane_essence"] = "Essence arcanique"
     tab.append(f"{NS}:arcane_essence")
+
+    item_file("mana_potion", "minecraft:glass_bottle", {"max_stack_size": 16, "rarity": "uncommon"})
+    png(f"assets/{NS}/textures/item/mana_potion.png", mana_potion())
+    en[f"item.{NS}.mana_potion"] = "Mana Potion"
+    fr[f"item.{NS}.mana_potion"] = "Potion de mana"
+    tab.append(f"{NS}:mana_potion")
 
     en[f"itemGroup.{NS}.spellbooks"] = "Iron's Spellbooks"
     fr[f"itemGroup.{NS}.spellbooks"] = "Iron's Spellbooks"
@@ -326,6 +381,11 @@ def main():
         "magic_missile": ("minecraft:ender_pearl", 1),
         "teleport": ("minecraft:ender_pearl", 2),
         "gust": ("minecraft:feather", 1),
+        "frost_nova": ("minecraft:snowball", 3),
+        "chain_lightning": ("minecraft:lightning_rod", 2),
+        "blessing": ("minecraft:glowstone_dust", 3),
+        "blood_siphon": ("minecraft:redstone", 2),
+        "thorn_dart": ("minecraft:vine", 1),
     }
     for spell, colour in SCHOOLS.items():
         ingredient, copies = school_ingredient[spell]
@@ -347,6 +407,9 @@ def main():
     recipe("arcane_staff",
            ["minecraft:stick", "minecraft:blaze_rod"] + [f"{NS}:arcane_essence"] * 3,
            f"{NS}:arcane_staff")
+    recipe("mana_potion",
+           ["minecraft:glass_bottle", f"{NS}:arcane_essence", "minecraft:glowstone_dust"],
+           f"{NS}:mana_potion")
 
 
 if __name__ == "__main__":

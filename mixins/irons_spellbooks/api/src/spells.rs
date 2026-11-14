@@ -15,6 +15,8 @@ pub enum School {
     Holy,
     Ender,
     Evocation,
+    Blood,
+    Nature,
 }
 
 impl School {
@@ -26,6 +28,8 @@ impl School {
             School::Holy => "Holy",
             School::Ender => "Ender",
             School::Evocation => "Evocation",
+            School::Blood => "Blood",
+            School::Nature => "Nature",
         }
     }
 
@@ -39,6 +43,8 @@ impl School {
             School::Holy => 'e',
             School::Ender => 'd',
             School::Evocation => 'a',
+            School::Blood => '4',
+            School::Nature => '2',
         }
     }
 
@@ -51,6 +57,8 @@ impl School {
             School::Holy => 0xF7_E8_8A,
             School::Ender => 0xC0_5C_F0,
             School::Evocation => 0x7B_E0_8C,
+            School::Blood => 0xB0_20_30,
+            School::Nature => 0x4E_9F_3D,
         }
     }
 }
@@ -68,6 +76,14 @@ pub enum Kind {
     MagicMissile,
     Teleport,
     Gust,
+    /// A ring of frost around the caster, thrown outwards.
+    FrostNova,
+    /// Lightning at the crosshair that leaps to what stands nearby.
+    ChainLightning,
+    /// A regeneration effect on the caster.
+    Regeneration,
+    /// Damage the creature in front and mend the caster with half of it.
+    Siphon,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -115,7 +131,7 @@ impl Spell {
     }
 }
 
-pub const SPELLS: [Spell; 10] = [
+pub const SPELLS: [Spell; 15] = [
     Spell {
         id: "firebolt",
         name: "Firebolt",
@@ -156,7 +172,7 @@ pub const SPELLS: [Spell; 10] = [
         power: 4.0,
         power_per_level: 1.25,
         range: 32.0,
-        summary: "A shard of ice that wounds and slows its target.",
+        summary: "A shard of ice that wounds the first creature it meets.",
     },
     Spell {
         id: "frost_step",
@@ -255,6 +271,76 @@ pub const SPELLS: [Spell; 10] = [
         power_per_level: 0.4,
         range: 8.0,
         summary: "A blast of wind that throws back what stands before you.",
+    },
+    Spell {
+        id: "frost_nova",
+        name: "Frost Nova",
+        kind: Kind::FrostNova,
+        school: School::Ice,
+        max_level: 3,
+        mana: 25.0,
+        mana_per_level: 8.0,
+        cooldown: 160,
+        power: 6.0,
+        power_per_level: 2.5,
+        range: 6.0,
+        summary: "Bursts in a ring of frost, wounding and throwing back what stands close.",
+    },
+    Spell {
+        id: "chain_lightning",
+        name: "Chain Lightning",
+        kind: Kind::ChainLightning,
+        school: School::Lightning,
+        max_level: 4,
+        mana: 30.0,
+        mana_per_level: 8.0,
+        cooldown: 180,
+        power: 6.0,
+        power_per_level: 2.0,
+        range: 24.0,
+        summary: "Strikes where you look and leaps to everything standing nearby.",
+    },
+    Spell {
+        id: "blessing",
+        name: "Blessing",
+        kind: Kind::Regeneration,
+        school: School::Holy,
+        max_level: 4,
+        mana: 25.0,
+        mana_per_level: 8.0,
+        cooldown: 300,
+        power: 1.0,
+        power_per_level: 1.0,
+        range: 0.0,
+        summary: "Mends your wounds over time.",
+    },
+    Spell {
+        id: "blood_siphon",
+        name: "Blood Siphon",
+        kind: Kind::Siphon,
+        school: School::Blood,
+        max_level: 4,
+        mana: 22.0,
+        mana_per_level: 6.0,
+        cooldown: 120,
+        power: 5.0,
+        power_per_level: 2.0,
+        range: 6.0,
+        summary: "Tears life from the creature before you and gives you half of it.",
+    },
+    Spell {
+        id: "thorn_dart",
+        name: "Thorn Dart",
+        kind: Kind::Icicle,
+        school: School::Nature,
+        max_level: 5,
+        mana: 10.0,
+        mana_per_level: 2.0,
+        cooldown: 24,
+        power: 4.0,
+        power_per_level: 1.2,
+        range: 30.0,
+        summary: "A dart of thorns that flies straight at the first creature it meets.",
     },
 ];
 

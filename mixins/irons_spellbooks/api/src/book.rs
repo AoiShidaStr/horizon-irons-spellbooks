@@ -27,12 +27,21 @@ pub fn book_capacity(item: &str) -> Option<usize> {
     }
 }
 
-/// Whether the item is one of the wandering mage's four armour pieces.
+/// Whether the item is one of a mage set's four armour pieces.
 pub fn is_mage_armour(item: &str) -> bool {
-    matches!(
-        item.strip_prefix(MOD_ID).and_then(|rest| rest.strip_prefix(':')),
-        Some("wizard_hat" | "wizard_robe" | "wizard_leggings" | "wizard_boots")
-    )
+    let Some(path) = item.strip_prefix(MOD_ID).and_then(|rest| rest.strip_prefix(':')) else {
+        return false;
+    };
+    let Some((set, piece)) = path.rsplit_once('_') else {
+        return false;
+    };
+    matches!(piece, "hat" | "robe" | "leggings" | "boots")
+        && matches!(set, "wizard" | "pyromancer" | "cryomancer" | "electromancer")
+}
+
+/// Whether the item is the mana potion.
+pub fn is_mana_potion(item: &str) -> bool {
+    item.strip_prefix(MOD_ID) == Some(":mana_potion")
 }
 
 pub fn is_staff(item: &str) -> bool {
@@ -184,7 +193,12 @@ mod tests {
         assert_eq!(book_capacity("irons_spellbooks:archmage_spellbook"), Some(10));
         assert_eq!(book_capacity("minecraft:book"), None);
         assert!(is_mage_armour("irons_spellbooks:wizard_hat"));
+        assert!(is_mage_armour("irons_spellbooks:pyromancer_boots"));
+        assert!(is_mage_armour("irons_spellbooks:electromancer_robe"));
+        assert!(!is_mage_armour("irons_spellbooks:wizard_sword"));
         assert!(!is_mage_armour("minecraft:leather_helmet"));
+        assert!(is_mana_potion("irons_spellbooks:mana_potion"));
+        assert!(!is_mana_potion("minecraft:potion"));
         assert!(is_staff("irons_spellbooks:arcane_staff"));
         assert!(is_casting_item("irons_spellbooks:scroll_gust"));
         assert!(!is_casting_item("irons_spellbooks:arcane_essence"));

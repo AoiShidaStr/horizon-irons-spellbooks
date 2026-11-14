@@ -1,0 +1,12 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "ingredients": [
+    "minecraft:glass_bottle",
+    "irons_spellbooks:arcane_essence",
+    "minecraft:glowstone_dust"
+  ],
+  "result": {
+    "id": "irons_spellbooks:mana_potion",
+    "count": 1
+  }
+}

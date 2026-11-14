@@ -64,6 +64,23 @@ pub fn tooltip(host: &dyn Host, event: &mut TooltipEvent<'_>) {
             Text::literal("Sneak + use: next page").with_color(0x7A_7A_7A),
             0xFF7A_7A_7A,
         ));
+        event.lines.push((
+            Text::literal("Use with a scroll in the off hand: inscribe it")
+                .with_color(0x7A_7A_7A),
+            0xFF7A_7A_7A,
+        ));
+        return;
+    }
+
+    if book::is_mana_potion(item) {
+        event.lines.push((
+            Text::literal(format!(
+                "Restores {:.0} mana",
+                crate::mana::POTION_RESTORE
+            ))
+            .with_color(0x4C_6B_FF),
+            0xFF4C_6B_FF,
+        ));
         return;
     }
 

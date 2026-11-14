@@ -1,0 +1,12 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "ingredients": [
+    "minecraft:paper",
+    "irons_spellbooks:arcane_essence",
+    "minecraft:vine"
+  ],
+  "result": {
+    "id": "irons_spellbooks:scroll_thorn_dart",
+    "count": 1
+  }
+}

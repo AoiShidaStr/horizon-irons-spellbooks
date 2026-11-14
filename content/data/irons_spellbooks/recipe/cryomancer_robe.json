@@ -1,0 +1,12 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "ingredients": [
+    "minecraft:leather_chestplate",
+    "irons_spellbooks:arcane_essence",
+    "irons_spellbooks:arcane_essence"
+  ],
+  "result": {
+    "id": "irons_spellbooks:cryomancer_robe",
+    "count": 1
+  }
+}
