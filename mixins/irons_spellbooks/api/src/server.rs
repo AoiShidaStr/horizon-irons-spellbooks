@@ -11,18 +11,21 @@ use std::sync::atomic::{AtomicU32, Ordering};
 
 use horizon_client::mod_api::{
     Compound, EquipmentSlot, Flow, Host, ItemStack, NativeEffect, NativeInventoryKind,
-    NativeServerPlayer, Tag, Text, UseItemEvent,
+    NativeServerPlayer, ParticleOptions, ParticleType, Tag, Text, UseItemEvent,
 };
 
 use crate::aim;
 use crate::book::{self, Book, Refused};
 use crate::mana;
-use crate::spells::{self, Kind, Spell};
+use crate::spells::{self, Kind, School, Spell};
 use crate::state;
 
 /// How often the client is told its mana, in ticks (four times a second is
 /// enough for a bar).
 const SYNC_EVERY: u32 = 5;
+
+/// Vanilla's `SoundSource` ordinals: a spell's sound is one a player makes.
+const PLAYER_SOUND: usize = 7;
 
 static TICKS: AtomicU32 = AtomicU32::new(0);
 
@@ -272,7 +275,8 @@ pub fn cast(
         let _ = state::save(host, player.uuid, &pool);
         return Err(Refusal::Mana(cost));
     }
-    cast_sound(host, player);
+    cast_sound(host, player, spell.school);
+    cast_anim(host, player);
     // A scroll is spent anyway; both start the spell's rest.
     let ticks = if from_scroll { spell.cooldown / 2 } else { spell.cooldown };
     pool.start_cooldown(spell.id, ticks);
@@ -287,6 +291,11 @@ fn has_staff(host: &mut dyn Host) -> bool {
 }
 
 /// Plays the spell's effect. False when the game refused the command it needed.
+///
+/// Every spell uses the table's strength: a direct spell hurts the creature in
+/// the line of sight for it (it no longer borrows a vanilla projectile's
+/// damage), lightning is a visual bolt over the table's damage, and what a hit
+/// leaves behind is the school's own (fire sets it alight, ice slows it).
 fn play(
     host: &mut dyn Host,
     player: &NativeServerPlayer,
@@ -299,6 +308,7 @@ fn play(
     match spell.kind {
         Kind::Heal => {
             let amplifier = (strength / 4.0) as u8;
+            burst(host, eye(player), spell.school, 12);
             effect(
                 host,
                 player.uuid,
@@ -316,81 +326,100 @@ fn play(
                     continue;
                 }
                 any |= effect(host, other.uuid, "minecraft:absorption", amplifier, 1200);
+                if any {
+                    burst(host, eye(&other), spell.school, 8);
+                }
             }
             any
         }
         Kind::Regeneration => {
             let amplifier = (level - 1).min(3);
+            burst(host, eye(player), spell.school, 12);
             effect(host, player.uuid, "minecraft:regeneration", amplifier, 200)
         }
         Kind::LightningBolt => {
-            let hit = host.raycast(spell.range);
-            let Some(hit) = hit else {
-                return false;
-            };
-            host.summon(
-                &player.dimension,
-                "minecraft:lightning_bolt",
-                [hit.x, hit.y, hit.z],
-                Compound::new(),
-            )
-            .is_some()
+            let at = impact(host, player, spell.range);
+            // The bolt is the show: the damage is the table's, not the
+            // vanilla strike's 5.
+            let _ = host.lightning_bolt(&player.dimension, at, true);
+            let _ = blast(host, player, at, 2.0, strength, "minecraft:magic");
+            for (id, _) in within(host, &player.dimension, at, 2.0) {
+                if is_self(player, id) {
+                    continue;
+                }
+                afflict(host, id, spell.school);
+            }
+            burst(host, at, spell.school, 24);
+            true
         }
         Kind::ChainLightning => {
-            let hit = host.raycast(spell.range);
-            let Some(hit) = hit else {
-                return false;
-            };
-            let at = [hit.x, hit.y, hit.z];
+            let at = impact(host, player, spell.range);
             let _ = host.lightning_bolt(&player.dimension, at, true);
             let _ = blast(host, player, at, 4.0, strength, "minecraft:magic");
+            for (id, _) in within(host, &player.dimension, at, 4.0) {
+                if is_self(player, id) {
+                    continue;
+                }
+                afflict(host, id, spell.school);
+            }
+            burst(host, at, spell.school, 30);
             true
         }
         Kind::FrostStep | Kind::Teleport => {
             let wanted = f64::from(strength);
-            let eye = aim::cast_from(player.position, [0.0, 0.0, 0.0], 0.0);
+            let from = eye(player);
             let hit = host
                 .raycast(spell.range)
-                .map(|hit| distance(eye, [hit.x, hit.y, hit.z]));
+                .map(|hit| distance(from, [hit.x, hit.y, hit.z]));
             let reach = aim::blink_reach(wanted, hit);
             let target = [
                 player.position[0] + dir[0] * reach,
                 player.position[1] + dir[1] * reach,
                 player.position[2] + dir[2] * reach,
             ];
-            host.teleport_player(
+            burst(host, from, spell.school, 16);
+            let landed = host.teleport_player(
                 player.uuid,
                 &player.dimension,
                 target,
                 player.yaw,
                 player.pitch,
-            )
+            );
+            if landed {
+                burst(host, eye(player), spell.school, 16);
+            }
+            landed
         }
-        Kind::Firebolt => projectile(host, player, dir, "minecraft:small_fireball", 1.4),
+        Kind::Firebolt | Kind::Icicle | Kind::MagicMissile => {
+            bolt(host, player, spell, dir, strength)
+        }
         Kind::Fireball => {
-            let hit = host.raycast(spell.range);
-            let Some(hit) = hit else {
-                return false;
-            };
-            let at = [hit.x, hit.y, hit.z];
+            let at = impact(host, player, spell.range);
             let _ = blast(host, player, at, 3.0, strength, "minecraft:magic");
+            for (id, _) in within(host, &player.dimension, at, 3.0) {
+                if is_self(player, id) {
+                    continue;
+                }
+                ignite(host, id, spell.school.ignite_ticks());
+            }
+            burst(host, at, spell.school, 30);
             true
         }
         Kind::FrostNova => {
             let targets = within(host, &player.dimension, player.position, f64::from(spell.range));
             let attacker = attacker(player);
-            let mut any = false;
             for (id, at) in targets {
                 if is_self(player, id) {
                     continue;
                 }
-                any |= host.hurt_entity(
+                let _ = host.hurt_entity(
                     &player.dimension,
                     id,
                     strength,
                     "minecraft:magic",
                     attacker,
                 );
+                afflict(host, id, spell.school);
                 let away = [
                     at[0] - player.position[0],
                     0.25,
@@ -404,11 +433,9 @@ fn play(
                 ];
                 let _ = host.push_mob(&player.dimension, id, push);
             }
-            let _ = any;
+            ring(host, player, spell, f64::from(spell.range));
             true
         }
-        Kind::Icicle => arrow(host, player, dir, 2.6, strength, true),
-        Kind::MagicMissile => arrow(host, player, dir, 3.2, strength, false),
         Kind::Gust => {
             let targets = in_front(host, player, dir, f64::from(spell.range) + 4.0, 3.0);
             for (id, at) in targets {
@@ -428,12 +455,19 @@ fn play(
                 ];
                 let _ = host.push_mob(&player.dimension, id, push);
             }
+            let from = aim::cast_from(player.position, dir, 1.0);
+            let to = [
+                from[0] + dir[0] * f64::from(spell.range),
+                from[1] + dir[1] * f64::from(spell.range),
+                from[2] + dir[2] * f64::from(spell.range),
+            ];
+            trail(host, from, to, spell.school);
             true
         }
         Kind::Siphon => {
             let targets = in_front(host, player, dir, f64::from(spell.range), 2.5);
             let attacker = attacker(player);
-            let Some((id, _)) = targets
+            let Some((id, at)) = targets
                 .into_iter()
                 .min_by(|a, b| {
                     let da = distance(player.position, a.1);
@@ -452,6 +486,8 @@ fn play(
             ) {
                 return false;
             }
+            afflict(host, id, spell.school);
+            trail(host, eye(player), [at[0], at[1] + 1.0, at[2]], spell.school);
             let amplifier = ((strength / 8.0) as u8).min(3);
             let _ = effect(
                 host,
@@ -463,6 +499,216 @@ fn play(
             true
         }
     }
+}
+
+/// A direct-damage spell: the first creature in the line of sight takes the
+/// spell's own damage — the table's number, not a vanilla projectile's — and
+/// the shot is drawn as a trail of the school's particles. A shot that meets
+/// nobody still costs its mana: it was cast.
+fn bolt(
+    host: &mut dyn Host,
+    player: &NativeServerPlayer,
+    spell: &Spell,
+    dir: [f64; 3],
+    damage: f32,
+) -> bool {
+    let from = eye(player);
+    let reach = host
+        .raycast(spell.range)
+        .map(|hit| distance(from, [hit.x, hit.y, hit.z]).min(f64::from(spell.range)))
+        .unwrap_or(f64::from(spell.range));
+    let target = nearest_on_line(host, player, from, dir, reach);
+    let at = match target {
+        Some((_, at)) => [at[0], at[1] + 1.0, at[2]],
+        None => [
+            from[0] + dir[0] * reach,
+            from[1] + dir[1] * reach,
+            from[2] + dir[2] * reach,
+        ],
+    };
+    trail(host, from, at, spell.school);
+    let Some((id, _)) = target else {
+        return true;
+    };
+    // Magic Missile is the one that ignores armour.
+    let damage_type = if spell.id == "magic_missile" {
+        "minecraft:magic"
+    } else {
+        "minecraft:generic"
+    };
+    let _ = host.hurt_entity(
+        &player.dimension,
+        id,
+        damage,
+        damage_type,
+        attacker(player),
+    );
+    ignite(host, id, spell.school.ignite_ticks());
+    afflict(host, id, spell.school);
+    burst(host, at, spell.school, 12);
+    true
+}
+
+/// The first creature whose body a shot from the eye meets on its way, as its
+/// id and position: a creature within 1.2 blocks of the aim line, nearest
+/// first.
+fn nearest_on_line(
+    host: &mut dyn Host,
+    player: &NativeServerPlayer,
+    from: [f64; 3],
+    dir: [f64; 3],
+    reach: f64,
+) -> Option<(u32, [f64; 3])> {
+    let mut best: Option<(u32, [f64; 3], f64)> = None;
+    for (id, _, at) in host.level_entities(&player.dimension) {
+        if is_self(player, id) {
+            continue;
+        }
+        let centre = [at[0], at[1] + 1.0, at[2]];
+        let d = [
+            centre[0] - from[0],
+            centre[1] - from[1],
+            centre[2] - from[2],
+        ];
+        let along = d[0] * dir[0] + d[1] * dir[1] + d[2] * dir[2];
+        if along <= 0.0 || along > reach {
+            continue;
+        }
+        let side = (d[0] * d[0] + d[1] * d[1] + d[2] * d[2] - along * along)
+            .max(0.0)
+            .sqrt();
+        if side > 1.2 {
+            continue;
+        }
+        let closer = match best {
+            Some((_, _, nearest)) => along < nearest,
+            None => true,
+        };
+        if closer {
+            best = Some((id, at, along));
+        }
+    }
+    best.map(|(id, at, _)| (id, at))
+}
+
+/// The player's eye, where a spell starts and is aimed from.
+fn eye(player: &NativeServerPlayer) -> [f64; 3] {
+    [
+        player.position[0],
+        player.position[1] + aim::EYE,
+        player.position[2],
+    ]
+}
+
+/// Where a ray of `range` blocks from the crosshair stops: the block it met,
+/// or the point it reaches.
+fn impact(host: &mut dyn Host, player: &NativeServerPlayer, range: f32) -> [f64; 3] {
+    match host.raycast(range) {
+        Some(hit) => [hit.x, hit.y, hit.z],
+        None => {
+            let dir = aim::direction(player.yaw, player.pitch);
+            let from = eye(player);
+            [
+                from[0] + dir[0] * f64::from(range),
+                from[1] + dir[1] * f64::from(range),
+                from[2] + dir[2] * f64::from(range),
+            ]
+        }
+    }
+}
+
+/// The particles the school's spells give off.
+fn school_particle(school: School) -> ParticleType {
+    match school {
+        School::Fire => ParticleType::Flame,
+        School::Ice | School::Holy => ParticleType::EndRod,
+        School::Lightning => ParticleType::ElectricSpark,
+        School::Ender => ParticleType::Portal,
+        School::Evocation => ParticleType::Crit,
+        School::Blood => ParticleType::Lava,
+        School::Nature => ParticleType::SporeBlossomAir,
+    }
+}
+
+/// A puff of the school's particles at `at`.
+fn burst(host: &mut dyn Host, at: [f64; 3], school: School, count: i32) -> bool {
+    host.send_particles(
+        &ParticleOptions::simple(school_particle(school)),
+        None,
+        at,
+        [0.45, 0.45, 0.45],
+        0.08,
+        count,
+    )
+}
+
+/// The path of a shot, as puffs of the school's particles.
+fn trail(host: &mut dyn Host, from: [f64; 3], to: [f64; 3], school: School) {
+    let options = ParticleOptions::simple(school_particle(school));
+    for step in 1..=8 {
+        let t = f64::from(step) / 8.0;
+        let at = [
+            from[0] + (to[0] - from[0]) * t,
+            from[1] + (to[1] - from[1]) * t,
+            from[2] + (to[2] - from[2]) * t,
+        ];
+        let _ = host.send_particles(&options, None, at, [0.1, 0.1, 0.1], 0.0, 1);
+    }
+}
+
+/// A ring of the school's particles on the ground around the caster, for the
+/// spells that burst outwards.
+fn ring(host: &mut dyn Host, player: &NativeServerPlayer, spell: &Spell, radius: f64) {
+    let options = ParticleOptions::simple(school_particle(spell.school));
+    for step in 0..16 {
+        let angle = f64::from(step) * std::f64::consts::TAU / 16.0;
+        let at = [
+            player.position[0] + angle.cos() * radius,
+            player.position[1] + 0.2,
+            player.position[2] + angle.sin() * radius,
+        ];
+        let _ = host.send_particles(&options, None, at, [0.1, 0.2, 0.1], 0.0, 1);
+    }
+}
+
+/// Leaves the school's effect on a mob (`minecraft:slowness` for ice, poison
+/// for nature, weakness for blood, glowing for lightning).
+fn afflict(host: &mut dyn Host, id: u32, school: School) -> bool {
+    match school.affliction() {
+        Some((effect, amplifier, ticks)) => effect_on_mob(host, id, effect, amplifier, ticks),
+        None => false,
+    }
+}
+
+/// Gives a vanilla effect to a mob, found by its entity id.
+fn effect_on_mob(host: &mut dyn Host, id: u32, effect: &str, amplifier: u8, ticks: i32) -> bool {
+    let Some(entity) = host.entity(id) else {
+        return false;
+    };
+    let Some(uuid) = host.entity_uuid(entity) else {
+        return false;
+    };
+    host.add_effect(
+        uuid,
+        &NativeEffect {
+            id: effect.to_string(),
+            amplifier,
+            duration: ticks,
+            ambient: false,
+            particles: true,
+        },
+    )
+}
+
+/// Sets a mob alight for `ticks`; 0 does nothing.
+fn ignite(host: &mut dyn Host, id: u32, ticks: i32) -> bool {
+    if ticks <= 0 {
+        return false;
+    }
+    let Some(entity) = host.entity(id) else {
+        return false;
+    };
+    host.entity_set_fire(entity, ticks)
 }
 
 /// Whether an entity id is the caster's own.
@@ -581,65 +827,30 @@ fn write_held(
     .is_ok()
 }
 
-/// A quiet casting sound at the caster's feet.
-fn cast_sound(host: &mut dyn Host, player: &NativeServerPlayer) {
-    let _ = host.play_sound_to(
-        player.uuid,
-        "minecraft:block.enchantment_table.use",
-        "player",
-        Some([
+/// The school's sound at the caster, heard by everyone near them.
+fn cast_sound(host: &mut dyn Host, player: &NativeServerPlayer, school: School) {
+    let _ = host.play_sound(
+        school.sound(),
+        [
             player.position[0],
             player.position[1] + 1.0,
             player.position[2],
-        ]),
-        0.7,
-        1.4,
+        ],
+        PLAYER_SOUND,
+        0.8,
+        1.0,
     );
 }
 
-/// Spawns a projectile moving along `dir`.
-///
-/// `host.summon` rather than a `/summon`: `run_command` is the console's and
-/// does nothing inside a player's hook (`use_item` is one), so the whole cast
-/// used to fall through with the mana refunded.
-fn projectile(
-    host: &mut dyn Host,
-    player: &NativeServerPlayer,
-    dir: [f64; 3],
-    kind: &str,
-    speed: f64,
-) -> bool {
-    let from = aim::cast_from(player.position, dir, 1.0);
-    let mut nbt = Compound::new();
-    nbt.insert("Motion".into(), motion_tag(aim::motion(dir, speed)));
-    host.summon(&player.dimension, kind, from, nbt).is_some()
-}
-
-/// Spawns an arrow of the spell's strength; `gravity` false for Magic Missile.
-fn arrow(
-    host: &mut dyn Host,
-    player: &NativeServerPlayer,
-    dir: [f64; 3],
-    speed: f64,
-    damage: f32,
-    gravity: bool,
-) -> bool {
-    let from = aim::cast_from(player.position, dir, 1.0);
-    let mut nbt = Compound::new();
-    nbt.insert("Motion".into(), motion_tag(aim::motion(dir, speed)));
-    nbt.insert("crit".into(), Tag::Byte(1));
-    nbt.insert("pickup".into(), Tag::Byte(0));
-    nbt.insert("HasBeenShot".into(), Tag::Byte(1));
-    nbt.insert("damage".into(), Tag::Double(f64::from(damage).to_bits()));
-    if !gravity {
-        nbt.insert("NoGravity".into(), Tag::Byte(1));
+/// The caster's arm swings, as if the spell were thrown.
+fn cast_anim(host: &mut dyn Host, player: &NativeServerPlayer) {
+    if player.entity_id <= 0 {
+        return;
     }
-    host.summon(&player.dimension, "minecraft:arrow", from, nbt)
-        .is_some()
-}
-
-fn motion_tag(motion: [f64; 3]) -> Tag {
-    Tag::List(motion.iter().map(|v| Tag::Double(v.to_bits())).collect())
+    let Some(entity) = host.entity(player.entity_id as u32) else {
+        return;
+    };
+    let _ = host.entity_swing(entity, false);
 }
 
 fn distance(a: [f64; 3], b: [f64; 3]) -> f64 {

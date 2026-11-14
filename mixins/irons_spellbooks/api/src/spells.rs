@@ -61,6 +61,43 @@ impl School {
             School::Nature => 0x4E_9F_3D,
         }
     }
+
+    /// The vanilla effect a spell of this school leaves on what it wounds, as
+    /// its id, its amplifier and how many ticks it lasts. Fire sets what it
+    /// hits alight instead ([`School::ignite_ticks`]), and the schools with
+    /// none only wound.
+    pub fn affliction(self) -> Option<(&'static str, u8, i32)> {
+        match self {
+            School::Ice => Some(("minecraft:slowness", 1, 100)),
+            School::Lightning => Some(("minecraft:glowing", 0, 100)),
+            School::Nature => Some(("minecraft:poison", 0, 100)),
+            School::Blood => Some(("minecraft:weakness", 0, 200)),
+            School::Fire | School::Holy | School::Ender | School::Evocation => None,
+        }
+    }
+
+    /// How long a spell of the school sets what it hits alight, in ticks: three
+    /// seconds for fire, nothing for the other schools.
+    pub fn ignite_ticks(self) -> i32 {
+        match self {
+            School::Fire => 60,
+            _ => 0,
+        }
+    }
+
+    /// The sound a spell of the school plays at its caster.
+    pub fn sound(self) -> &'static str {
+        match self {
+            School::Fire => "minecraft:item.firecharge.use",
+            School::Ice => "minecraft:block.glass.break",
+            School::Lightning => "minecraft:entity.lightning_bolt.impact",
+            School::Holy => "minecraft:block.beacon.activate",
+            School::Ender => "minecraft:entity.enderman.teleport",
+            School::Evocation => "minecraft:entity.evocation_illager.cast_spell",
+            School::Blood => "minecraft:entity.witch.drink",
+            School::Nature => "minecraft:block.grass.place",
+        }
+    }
 }
 
 /// What a spell does when it is cast.
@@ -406,6 +443,24 @@ mod tests {
         for spell in &SPELLS {
             assert!(spell.mana_cost(spell.max_level) <= 100.0, "{}", spell.id);
         }
+    }
+
+    #[test]
+    fn every_school_sounds_and_only_some_afflict() {
+        for spell in &SPELLS {
+            assert!(spell.school.sound().starts_with("minecraft:"), "{}", spell.id);
+            assert!(
+                spell.school.ignite_ticks() == 0 || spell.school == School::Fire,
+                "{}",
+                spell.id
+            );
+        }
+        assert_eq!(School::Ice.affliction(), Some(("minecraft:slowness", 1, 100)));
+        assert_eq!(School::Nature.affliction(), Some(("minecraft:poison", 0, 100)));
+        assert_eq!(School::Blood.affliction(), Some(("minecraft:weakness", 0, 200)));
+        assert_eq!(School::Holy.affliction(), None);
+        assert_eq!(School::Fire.ignite_ticks(), 60);
+        assert_eq!(School::Ender.ignite_ticks(), 0);
     }
 
     #[test]

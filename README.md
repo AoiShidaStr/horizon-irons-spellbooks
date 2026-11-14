@@ -40,16 +40,32 @@ files, so they can be regenerated and audited.
   `net_from_server` (the bar's value).
 - Casting runs on the server through the trait API, so no `/effect` permission
   is involved: `Host::add_effect` for Heal, Fortify, Blessing and the siphon's
-  self-heal, `Host::summon` for Firebolt's fireball and the Icicle, Thorn Dart
-  and Magic Missile arrows, `Host::lightning_bolt` for Lightning Bolt and Chain
-  Lightning, `Host::teleport_player` for the blinks, `Host::entities_in` /
-  `Host::level_entities` with `Host::hurt_entity` for the area blasts (Fireball
-  included), and `Host::push_mob` for Frost Nova and Gust.
+  self-heal, `Host::lightning_bolt` for Lightning Bolt and Chain Lightning,
+  `Host::teleport_player` for the blinks, `Host::level_entities` with
+  `Host::hurt_entity` for the blasts (Fireball and Frost Nova included), and
+  `Host::push_mob` for Frost Nova and Gust.
+- **Every spell deals the table's number.** The direct spells (Firebolt,
+  Icicle, Thorn Dart, Magic Missile) no longer ride on a vanilla projectile's
+  damage: the first creature within 1.2 blocks of the aim line, inside the
+  spell's range and short of the wall it looks at, takes the spell's own
+  strength (`minecraft:generic`, `minecraft:magic` for Magic Missile, which
+  ignores armour). Lightning Bolt and Chain Lightning strike with a visual-only
+  `Host::lightning_bolt` and the table's damage around it, so no vanilla 5 is
+  added. A shot that meets nobody still costs its mana.
+- **A hit carries its school:** fire sets what it hits alight (3 s), ice slows
+  it (`minecraft:slowness` II, 5 s), lightning leaves it glowing, nature poisons
+  it and blood weakens it — applied to mobs through `Host::entity` +
+  `Host::entity_uuid` + `Host::add_effect` (school, values and sounds are
+  `School::affliction` / `ignite_ticks` / `sound` in `spells.rs`, tested).
+- **Every cast shows and sounds like its school:** a trail of the school's
+  particles along the shot (flame, end rod, electric spark, portal, crit, lava,
+  spore blossom), a burst where it lands, a ring on the ground for Frost Nova,
+  the school's vanilla sound through `Host::play_sound`, and the caster's arm
+  swings (`Host::entity_swing`).
 - Page turns and inscriptions write the held stack back (`Host::set_component`
   + `Host::set_inventory_slot`), so the selected page survives the click and a
   scroll held in the off hand is consumed into the book. A mana potion restores
-  50 mana when used. A quiet vanilla sound plays at the caster on a cast. No
-  item is consumed in creative.
+  50 mana when used. No item is consumed in creative.
 
 **Content**
 
@@ -63,18 +79,13 @@ files, so they can be regenerated and audited.
 
 ## Missing
 
-- **The direct-damage spells still use vanilla projectile damage** (Firebolt,
-  Icicle, Thorn Dart, Magic Missile, Lightning Bolt): only the area spells
-  (Fireball, Frost Nova, Chain Lightning) and Blood Siphon deal the table's
-  numbers.
-- **No status effects on mobs**: Frost Nova pushes and wounds instead of
-  slowing, and nothing applies poison, fire or weakness to a victim.
-- **No particle work, school-specific sounds or casting animation**: one
-  vanilla sound plays, and the HUD bar is a plain box without a cooldown sweep.
-- **Spell effects are still approximations**: Firebolt, Icicle, Thorn Dart and
-  Magic Missile are vanilla projectiles (no custom projectile entity), and
-  Magic Missile reaches its target only because its arrow ignores gravity.
-- **No mob that drops scrolls, no structure loot, no advancements.**
+- **Shots are instant, not travelling**: the line of sight decides the hit and
+  particles draw the path; there is no projectile entity with a flight time and
+  no dodge by movement after the cast.
+- **The HUD bar has no cooldown sweep**: it shows the pool only, and the last
+  rest time is in the tooltip and the action-bar line.
+- **Nothing drops scrolls**: no mob loot entry, no structure loot, no
+  advancements.
 - **Mage armour has no attribute modifiers or enchantment behaviour** beyond
   the leather template and the native maximum-mana bonus.
 - **A spellbook's page can be torn out in `book.rs` but no in-game interaction
